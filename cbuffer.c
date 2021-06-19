@@ -14,6 +14,10 @@ osSemaphoreId item;
 osSemaphoreDef(item);
 osSemaphoreId empty;
 osSemaphoreDef(empty);
+osSemaphoreId sem1;
+osSemaphoreDef(sem1);
+osSemaphoreId sem2;
+osSemaphoreDef(sem2);
 
 // Define the mutex
 osMutexId buffMutex;
@@ -31,7 +35,6 @@ unsigned int cbufferHead = 0;
 unsigned int cbufferTail = 0;
 unsigned char itemRemove = 0x00;
 
-
 void insert(unsigned char item1){
 	osSemaphoreWait(empty, osWaitForever);
 	osMutexWait(buffMutex, osWaitForever);
@@ -45,11 +48,13 @@ void producer_thread (void const *argument)
 {
 	unsigned char item = 0x01;
 	for(;;){
-	long int i=0;
+	long int i=0; // i<5
 	for(i=0; i<5; i++){
 		insert(item++);
 		t1++;
-		}
+  }
+	osSemaphoreWait(sem1, osWaitForever);
+	osSemaphoreRelease(sem2);
 	}
 }
 
@@ -71,11 +76,12 @@ void consumer_thread (void const *argument)
 	for(;;){
 	unsigned char data = 0x00;
 	long int j=0;
+	osSemaphoreRelease(sem1);
 	for(j=0; j<4; j++){
 		itemRemove=remove(data);
-		SendChar(itemRemove);
 		t2++;
-		}
+	}
+	osSemaphoreWait(sem2, osWaitForever);
   }
 }
 
@@ -86,6 +92,8 @@ int main (void)
 	USART1_Init ();
 	item = osSemaphoreCreate(osSemaphore(item), 0);	
 	empty = osSemaphoreCreate(osSemaphore(empty), 8);	
+	sem1 = osSemaphoreCreate(osSemaphore(sem1), 0);	
+	sem2 = osSemaphoreCreate(osSemaphore(sem2), 0);	
 	buffMutex = osMutexCreate(osMutex(buffMutex));
 	T_uart1 = osThreadCreate(osThread(producer_thread), NULL);  //producer
 	T_uart2 = osThreadCreate(osThread(consumer_thread), NULL);  //consumer
