@@ -46,7 +46,7 @@ void producer_thread (void const *argument)
 	unsigned char item = 0x01;
 	for(;;){
 	long int i=0;
-	for(i=0; i<5; i++){
+	for(i=0; i<10; i++){
 		insert(item++);
 		t1++;
 		}
@@ -71,7 +71,7 @@ void consumer_thread (void const *argument)
 	for(;;){
 	unsigned char data = 0x00;
 	long int j=0;
-	for(j=0; j<4; j++){
+	for(j=0; j<10; j++){
 		itemRemove=remove(data);
 		SendChar(itemRemove);
 		t2++;
