@@ -48,6 +48,39 @@ const unsigned char itemD = 0x44;
 unsigned char input[N]={item1,item2,item3,item4};
 unsigned char input2[N]={itemA,itemB,itemC,itemD};
 
+unsigned int t;
+unsigned int t1=0;
+unsigned int t2=0;
+unsigned int t3;
+int error;
+int testcount;
+
+void test(){
+	t3=t;
+  t=0+t1-t2;
+	testcount++;
+	if(t==0) {  //Empty
+		SendChar('E'); 
+		SendChar('\n');
+	}
+	else if(t==N) {  //Full
+		SendChar('F'); 
+		SendChar('\n');
+	}
+	else if(t>=N+1) {  //Error
+		error++;
+		SendChar('e'); SendChar('r'); SendChar('r');
+		SendChar('\n'); 
+	}
+	else if(t>=t3) { //Insert
+		SendChar('I'); 
+		SendChar('\n'); 
+	}	
+	else { //Remove
+		SendChar('R'); 
+		SendChar('\n'); 
+	}
+}
 
 void put(){
 	osSemaphoreWait(space_semaphore, osWaitForever);
@@ -58,6 +91,7 @@ void put(){
 		m=0;
 	}
 	insertPtr = (insertPtr + 1) % N;
+	t1++;
 	osMutexRelease(x_mutex);
 	osSemaphoreRelease(item_semaphore);
 }
@@ -71,6 +105,7 @@ void put2(){
 		n=0;
 	}
 	insertPtr = (insertPtr + 1) % N;
+	t1++;
 	osMutexRelease(x_mutex);
 	osSemaphoreRelease(item_semaphore);
 }
@@ -83,6 +118,7 @@ unsigned char get(){
 	SendChar(rr); SendChar('\n');
 	buffer[removePtr]=NULL;
 	removePtr = (removePtr + 1) % N;
+	t2++;
 	osMutexRelease(x_mutex);
 	osSemaphoreRelease(space_semaphore);
 	return rr;
@@ -96,6 +132,7 @@ void x_Thread1 (void const *argument)
 	// unsigned char item = 0x30;
 	for(i=0;i<10;i++){
 		put();
+		test();
 	}
 }
 
@@ -105,6 +142,7 @@ void x_Thread2 (void const *argument)
 	unsigned char item = 0x30;
 	for(j=0;j<10;j++){
 		put2();             //Place a value in the message queue
+		test();
 	}
 }
 
@@ -115,6 +153,7 @@ void x_Thread3 (void const *argument)
 	for(k=0;k<20;k++){
 		c2data = get();
 		osMessagePut(Q_LED,c2data,osWaitForever);             //Place a value in the message queue
+		test();
 	}
 }
 
@@ -124,7 +163,6 @@ void x_Thread4(void const *argument)
 	for(;;){
 		result = 	osMessageGet(Q_LED,osWaitForever);				//wait for a message to arrive
 		// SendChar(result.value.v);
-		// SendChar('\n');
 	}
 }
 
