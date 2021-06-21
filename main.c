@@ -2,93 +2,129 @@
 #include "cmsis_os.h"
 #include "uart.h"
 
-void producer_thread (void const *argument);
-void consumer_thread(void const *argument);
+void x_Thread1 (void const *argument);
+void x_Thread2 (void const *argument);
+void x_Thread3 (void const *argument);
+void x_Thread4 (void const *argument);
+osThreadDef(x_Thread1, osPriorityNormal, 1, 0);
+osThreadDef(x_Thread2, osPriorityNormal, 1, 0);
+osThreadDef(x_Thread3, osPriorityNormal, 1, 0);
+osThreadDef(x_Thread4, osPriorityNormal, 1, 0);
 
-// Define threads
-osThreadDef(producer_thread, osPriorityNormal,1,0);
-osThreadDef(consumer_thread, osPriorityNormal,1,0);
+osThreadId T_x1;
+osThreadId T_x2;
+osThreadId T_x3;
+osThreadId T_x4;
 
-// Define the semaphores
-osSemaphoreId item;
-osSemaphoreDef(item);
-osSemaphoreId empty;
-osSemaphoreDef(empty);
+osMessageQId Q_LED;
+osMessageQDef (Q_LED,0x16,unsigned char);
+osEvent  result;
 
-// Define the mutex
-osMutexId buffMutex;
-osMutexDef(buffMutex);
+osMutexId x_mutex;
+osMutexDef(x_mutex);
+osSemaphoreId item_semaphore;                         // Semaphore ID
+osSemaphoreDef(item_semaphore);                       // Semaphore definition
+osSemaphoreId space_semaphore;                         // Semaphore ID
+osSemaphoreDef(space_semaphore);                       // Semaphore definition
 
-osThreadId T_uart1;
-osThreadId T_uart2;
+long int x=0;
+long int i=0;
+long int j=0;
+long int k=0;
+long int m=0;
 
-unsigned int t;
-unsigned int t1=0;
-unsigned int t2=0;
-const unsigned int N = 8;
+const unsigned int N = 4;
 unsigned char buffer[N];
-unsigned int cbufferHead = 0;
-unsigned int cbufferTail = 0;
-unsigned char itemRemove = 0x00;
+unsigned int insertPtr = 0;
+unsigned int removePtr = 0;
+const unsigned char item1 = 0x30;
+const unsigned char item2 = 0x31;
+const unsigned char item3 = 0x32;
+const unsigned char item4 = 0x33;
+unsigned char input[N]={item1,item2,item3,item4};
 
+void put(){
+	osSemaphoreWait(space_semaphore, osWaitForever);
+	osMutexWait(x_mutex, osWaitForever);
+	buffer[insertPtr] = input[m];
+	m++;
+	if(m==4){
+		m=0;
+	}
+	insertPtr = (insertPtr + 1) % N;
+	osMutexRelease(x_mutex);
+	osSemaphoreRelease(item_semaphore);
 
-void insert(unsigned char item1){
-	osSemaphoreWait(empty, osWaitForever);
-	osMutexWait(buffMutex, osWaitForever);
-	buffer[cbufferTail] = item1;
-	cbufferTail = (cbufferTail + 1) % N;
-	osMutexRelease(buffMutex);
-	osSemaphoreRelease(item);
 }
 
-void producer_thread (void const *argument)
+unsigned char get(){
+	unsigned int rr = 0xff;
+	osSemaphoreWait(item_semaphore, osWaitForever);
+	osMutexWait(x_mutex, osWaitForever);
+	rr = buffer[removePtr];
+	SendChar(rr); SendChar('\n');
+	buffer[removePtr]=NULL;
+	removePtr = (removePtr + 1) % N;
+	osMutexRelease(x_mutex);
+	osSemaphoreRelease(space_semaphore);
+	return rr;
+}
+
+int loopcount = 20;
+
+void x_Thread1 (void const *argument) 
 {
-	unsigned char item = 0x01;
+	//producer
+	unsigned char item = 0x30;
 	for(;;){
-	long int i=0;
-	for(i=0; i<10; i++){
-		insert(item++);
-		t1++;
-		}
+		put();
 	}
 }
 
-
-unsigned char remove(unsigned char data1){
-	unsigned char output = 0x00;
-	osSemaphoreWait(item, osWaitForever);
-	osMutexWait(buffMutex, osWaitForever);
-	output = buffer[cbufferHead];
-	buffer[cbufferHead] = data1;
-	cbufferHead = (cbufferHead + 1) % N;
-	osMutexRelease(buffMutex);
-	osSemaphoreRelease(empty);
-	return output;
-}
-
-void consumer_thread (void const *argument) 
-{ 
-	for(;;){
-	unsigned char data = 0x00;
-	long int j=0;
-	for(j=0; j<10; j++){
-		itemRemove=remove(data);
-		SendChar(itemRemove);
-		t2++;
-		}
-  }
-}
-
-int main (void)
+void x_Thread2 (void const *argument) 
 {
-	osKernelInitialize ();   // initialize CMSIS-RTOS
+	//consumer (waiter #1)
+	unsigned int data = 0x00;
+	for(;;){
+		data = get();
+		osMessagePut(Q_LED,data,osWaitForever);             //Place a value in the message queue
+	}
+}
 
-	USART1_Init ();
-	item = osSemaphoreCreate(osSemaphore(item), 0);	
-	empty = osSemaphoreCreate(osSemaphore(empty), 8);	
-	buffMutex = osMutexCreate(osMutex(buffMutex));
-	T_uart1 = osThreadCreate(osThread(producer_thread), NULL);  //producer
-	T_uart2 = osThreadCreate(osThread(consumer_thread), NULL);  //consumer
+void x_Thread3 (void const *argument) 
+{
+	//consumer (waiter #2)
+	unsigned int c2data = 0x00;
+	for(;;){
+		c2data = get();
+		osMessagePut(Q_LED,c2data,osWaitForever);             //Place a value in the message queue
+	}
+}
+
+void x_Thread4(void const *argument)
+{
+	//cashier
+	for(;;){
+		result = 	osMessageGet(Q_LED,osWaitForever);				//wait for a message to arrive
+		SendChar(result.value.v);
+	}
+}
+
+int main (void) 
+{
+	osKernelInitialize ();                    // initialize CMSIS-RTOS
+	USART1_Init();
+	item_semaphore = osSemaphoreCreate(osSemaphore(item_semaphore), 0);
+	space_semaphore = osSemaphoreCreate(osSemaphore(space_semaphore), N);
+	x_mutex = osMutexCreate(osMutex(x_mutex));	
 	
-	osKernelStart ();	  // start thread execution 
+	Q_LED = osMessageCreate(osMessageQ(Q_LED),NULL);					//create the message queue
+	
+	T_x1 = osThreadCreate(osThread(x_Thread1), NULL);//producer
+	T_x2 = osThreadCreate(osThread(x_Thread2), NULL);//consumer
+	T_x3 = osThreadCreate(osThread(x_Thread3), NULL);//another consumer
+	T_x4 = osThreadCreate(osThread(x_Thread4), NULL);//casher
+	
+ 
+	osKernelStart ();                         // start thread execution 
 }
