@@ -31,17 +31,23 @@ long int x=0;
 long int i=0;
 long int j=0;
 long int k=0;
-long int m=0;
+long int m=0; long int n=0;
 
 const unsigned int N = 4;
 unsigned char buffer[N];
 unsigned int insertPtr = 0;
 unsigned int removePtr = 0;
-const unsigned char item1 = 0x30;
-const unsigned char item2 = 0x31;
-const unsigned char item3 = 0x32;
-const unsigned char item4 = 0x33;
+const unsigned char item1 = 0x31;
+const unsigned char item2 = 0x32;
+const unsigned char item3 = 0x33;
+const unsigned char item4 = 0x34;
+const unsigned char itemA = 0x41;
+const unsigned char itemB = 0x42;
+const unsigned char itemC = 0x43;
+const unsigned char itemD = 0x44;
 unsigned char input[N]={item1,item2,item3,item4};
+unsigned char input2[N]={itemA,itemB,itemC,itemD};
+
 
 void put(){
 	osSemaphoreWait(space_semaphore, osWaitForever);
@@ -54,7 +60,19 @@ void put(){
 	insertPtr = (insertPtr + 1) % N;
 	osMutexRelease(x_mutex);
 	osSemaphoreRelease(item_semaphore);
+}
 
+void put2(){
+	osSemaphoreWait(space_semaphore, osWaitForever);
+	osMutexWait(x_mutex, osWaitForever);
+	buffer[insertPtr] = input2[n];
+	n++;
+	if(n==4){
+		n=0;
+	}
+	insertPtr = (insertPtr + 1) % N;
+	osMutexRelease(x_mutex);
+	osSemaphoreRelease(item_semaphore);
 }
 
 unsigned char get(){
@@ -75,27 +93,26 @@ int loopcount = 20;
 void x_Thread1 (void const *argument) 
 {
 	//producer
-	unsigned char item = 0x30;
-	for(;;){
+	// unsigned char item = 0x30;
+	for(i=0;i<10;i++){
 		put();
 	}
 }
 
 void x_Thread2 (void const *argument) 
 {
-	//consumer (waiter #1)
-	unsigned int data = 0x00;
-	for(;;){
-		data = get();
-		osMessagePut(Q_LED,data,osWaitForever);             //Place a value in the message queue
+	//producer #2
+	unsigned char item = 0x30;
+	for(j=0;j<10;j++){
+		put2();             //Place a value in the message queue
 	}
 }
 
 void x_Thread3 (void const *argument) 
 {
-	//consumer (waiter #2)
+	//consumer (waiter)
 	unsigned int c2data = 0x00;
-	for(;;){
+	for(k=0;k<20;k++){
 		c2data = get();
 		osMessagePut(Q_LED,c2data,osWaitForever);             //Place a value in the message queue
 	}
@@ -106,7 +123,8 @@ void x_Thread4(void const *argument)
 	//cashier
 	for(;;){
 		result = 	osMessageGet(Q_LED,osWaitForever);				//wait for a message to arrive
-		SendChar(result.value.v);
+		// SendChar(result.value.v);
+		// SendChar('\n');
 	}
 }
 
