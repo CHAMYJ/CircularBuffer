@@ -55,6 +55,8 @@ unsigned int t3;
 int error;
 int testcount;
 
+//testing code
+//If want to test for error conditions, add "//" to item_semaphore or space_semaphore.
 void test(){
 	t3=t;
   t=0+t1-t2;
@@ -131,8 +133,8 @@ void x_Thread1 (void const *argument)
 	//producer
 	// unsigned char item = 0x30;
 	for(i=0;i<10;i++){
-		test();
 		put();
+		test();
 	}
 }
 
